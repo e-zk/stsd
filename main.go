@@ -10,11 +10,16 @@ import (
 	"time"
 )
 
+const (
+	min_sleep = 60
+	max_sleep = 180
+)
+
 /**
  * @brief Get date header from given url.
  *
- * Extracts and returns HTTP 'Date' header, enforcing a minimum TLS
- * version of TLS1.2.
+ * Extracts and returns the value of the HTTP 'Date' header.
+ * Enforces a minimum TLS version of TLS1.2 to prevent SSL downgrade attacks.
  * @param url Url to get date from.
  * @return Date as a string.
  * @return Error returned by http.Client.Get() if any
@@ -50,11 +55,9 @@ func getDateFrom(url string) (string, error) {
 	return date, err
 }
 
-const (
-	min_sleep = 60
-	max_sleep = 180
-)
-
+/**
+ * Sleep for random amount of time
+ */
 func randomSleep() {
 	sleepTime := time.Duration(min_sleep + rand.Int63n(max_sleep-min_sleep+1))
 	log.Printf("sleeping for %v\n", sleepTime*time.Minute)
