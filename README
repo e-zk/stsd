@@ -1,5 +1,27 @@
 stsd - Secure Time Synchronisation Daemon
 =========================================
+Set system date based on HTTPS date headers.
 
+how it works
+------------
 
+why?
+----
+
+pool file format
+----------------
+The pool file contains a newline separated list of HTTPS URLs, and optionally
+an associated onion address.
+The optional onion address will be favoured over the clearnet address when the
+--use-tor argument is given.
+
+Each line in the file of the format:
+
+	<url>:<onion (optional)>
+	
+Example file:
+
+	https://grapheneos.org/:
+	https://qubes-os.org/:http://qubesosfasa4zl44o4tws22di6kepyzfeqv3tg4e3ztknltfxqrymdad.onion/
+	https://whonix.org/:http://www.dds6qkxpwdeubwucdiaord2xgbbeyds25rbsgr73tbfpqpt4a6vjwsyd.onion/
 
