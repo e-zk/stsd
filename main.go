@@ -23,6 +23,17 @@ const (
 	defaultPoolFile = "/etc/stsd_pool"
 	minSleep        = 60
 	maxSleep        = 180
+	usageText       = `secure time sync daemon
+usage: stsd [-b] [--pool-file=file] [--use-proxy=proxy | --use-tor[=proxy]]
+where:
+  -b                 force using bsd date command syntax when setting date.
+  --pool-file=file   use the specified pool file (default: /etc/stsd_pool).
+  --use-proxy=proxy  proxy network requests through 'proxy' url.
+  --use-tor          use tor for network requests. favours onion addresses
+                     from the pool file. tor's proxy url can be configured
+                     by passing as an argument flag: '--use-tor=proxy'
+                     (default tor proxy url: 'socks5://localhost:9050').
+`
 )
 
 var (
@@ -196,15 +207,7 @@ func main() {
 	flag.Var(&torProxy, "use-tor", "use tor")
 	flag.StringVar(&poolFile, "pool-file", defaultPoolFile, "pool file to use")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "secure time sync daemon\n")
-		fmt.Fprintf(os.Stderr, "usage: stsd [-b] [--pool-file=file] [--use-proxy=proxy_url | --use-tor[=proxy]]\n")
-		fmt.Fprintf(os.Stderr, "where:\n")
-		fmt.Fprintf(os.Stderr, "  -b                     force using bsd date command syntax when setting date.\n")
-		fmt.Fprintf(os.Stderr, "  --pool-file=file       use the specified pool file. (default: /etc/stsd_pool).\n")
-		fmt.Fprintf(os.Stderr, "  --use-proxy=proxy_url  proxy network requests through 'proxy_url'.\n")
-		fmt.Fprintf(os.Stderr, "  --use-tor              use tor for network requests. favours onion addresses from the pool file.\n")
-		fmt.Fprintf(os.Stderr, "                         tor proxy URL can be configured by passing as argument: '--use-tor=[url]'.\n")
-		fmt.Fprintf(os.Stderr, "                         (default: 'socks5://localhost:9050').\n")
+		fmt.Fprintf(os.Stderr, usageText)
 	}
 	flag.Parse()
 
