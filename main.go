@@ -25,6 +25,7 @@ const (
 
 var (
 	torProxy torFlag
+	useProxy string
 	bsdDate  bool
 	poolFile string
 )
@@ -64,11 +65,29 @@ func getDateFrom(pool string) (string, error) {
 		},
 	}
 
+	// use tor socks proxy, or user proxy if specified
 	if torProxy.String() != "" {
 		proxyUrl, err := url.Parse(torProxy.proxyUrl)
 		if err != nil {
-			log.Fatalf("could not parse proxy url '%s'", proxyUrl)
+			return "", fmt.Errorf("could not parse proxy url '%s': %v", proxyUrl, err)
 		}
+
+		log.Printf("using tor proxy: '%s'", proxyUrl.String())
+
+		client.Transport = &http.Transport{
+			Proxy: http.ProxyURL(proxyUrl),
+			DialTLS: func(network, addr string) (net.Conn, error) {
+				conn, err := tls.Dial(network, addr, tlsConf)
+				return conn, err
+			},
+		}
+	} else if useProxy != "" {
+		proxyUrl, err := url.Parse(useProxy)
+		if err != nil {
+			return "", fmt.Errorf("could not parse proxy url '%s': %v", proxyUrl, err)
+		}
+
+		log.Printf("using proxy: '%s'", proxyUrl.String())
 
 		client.Transport = &http.Transport{
 			Proxy: http.ProxyURL(proxyUrl),
@@ -132,6 +151,7 @@ func selectPool() (string, error) {
 		text = scanner.Text()
 		urls = strings.Split(text, ",")
 
+		// if torProxy is specified, use onion. otherwise use clearnet url
 		if torProxy.String() != "" && len(urls) > 1 && urls[1] != "" {
 			pools = append(pools, urls[1])
 		} else {
@@ -140,24 +160,49 @@ func selectPool() (string, error) {
 		count++
 	}
 
+	// return random url from pools array
 	return pools[rand.Intn(count)], nil
+}
+
+func upDate() {
+	// select a random pool
+	pool, err := selectPool()
+	if err != nil {
+		log.Fatalf("error getting pool: %v", err)
+	}
+
+	log.Printf("selected pool url: %s", pool)
+	// get date from the selected pool url
+	date, err := getDateFrom(pool)
+	if err != nil {
+		log.Fatalf("error getting time: %v", err)
+	}
+
+	log.Printf("got date: %s", date)
+
+	// TODO actually set system date
+	fmt.Printf(">> date -s %s\n", date)
+
 }
 
 func main() {
 	rand.Seed(time.Now().Unix())
 
+	// setup flags
 	flag.BoolVar(&bsdDate, "b", false, "use bsd date command format")
+	flag.StringVar(&useProxy, "use-proxy", "", "use specified proxy")
 	flag.Var(&torProxy, "use-tor", "use tor")
 	flag.StringVar(&poolFile, "pool-file", defaultPoolFile, "pool file to use")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "secure time sync daemon\n")
-		fmt.Fprintf(os.Stderr, "usage: stsd [-b] [--pool-file=file] [--use-tor[=proxy]]\n")
+		fmt.Fprintf(os.Stderr, "usage: stsd [-b] [--pool-file=file] [--use-proxy=proxy_url | --use-tor[=proxy]]\n")
 		fmt.Fprintf(os.Stderr, "where:\n")
-		fmt.Fprintf(os.Stderr, "  -b                force using bsd date command syntax when setting date\n")
-		fmt.Fprintf(os.Stderr, "  --pool-file=file  use the specified pool file\n")
-		fmt.Fprintf(os.Stderr, "  --use-tor         use tor for network requests. favours onion addresses from the pool file.\n")
-		fmt.Fprintf(os.Stderr, "                    custom proxy URL can be configured by passing as argument: '--use-tor=[url]'.\n")
-		fmt.Fprintf(os.Stderr, "                    defaults to 'socks5://localhost:9050'.\n")
+		fmt.Fprintf(os.Stderr, "  -b                     force using bsd date command syntax when setting date.\n")
+		fmt.Fprintf(os.Stderr, "  --pool-file=file       use the specified pool file. (default: /etc/stsd_pool).\n")
+		fmt.Fprintf(os.Stderr, "  --use-proxy=proxy_url  proxy network requests through 'proxy_url'.\n")
+		fmt.Fprintf(os.Stderr, "  --use-tor              use tor for network requests. favours onion addresses from the pool file.\n")
+		fmt.Fprintf(os.Stderr, "                         tor proxy URL can be configured by passing as argument: '--use-tor=[url]'.\n")
+		fmt.Fprintf(os.Stderr, "                         (default: 'socks5://localhost:9050').\n")
 	}
 	flag.Parse()
 
@@ -166,24 +211,13 @@ func main() {
 		torProxy.Set(defaultTorProxy)
 	}
 
+	// if both --use-proxy and --use-tor are set; throw an error
+	if torProxy.String() != "" && useProxy != "" {
+		log.Fatalf("error: cannot use --use-tor option with --use-proxy.")
+	}
+
 	for {
-		// select a random pool
-		pool, err := selectPool()
-		if err != nil {
-			log.Fatalf("error getting pool: %v", err)
-		}
-
-		log.Printf("selected pool url: %s", pool)
-
-		// get date from the selected pool url
-		date, err := getDateFrom(pool)
-		if err != nil {
-			log.Fatalf("error getting time: %v", err)
-		}
-
-		// TODO set system date
-		fmt.Printf(">> date -s %s\n", date)
-
+		upDate()
 		randomSleep()
 	}
 }
