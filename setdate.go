@@ -62,7 +62,7 @@ func setOsDate(date string, os string) error {
 			return fmt.Errorf("failed to run date command: %v\nstderr: %s", err, stderrString)
 		}
 	default:
-		return fmt.Errorf("setting time on OS '%s' not supported!", runtime.GOOS)
+		return fmt.Errorf("setting time on OS '%s' not supported!", os)
 	}
 
 	return nil
