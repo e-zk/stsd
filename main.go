@@ -132,7 +132,7 @@ func selectPool() (string, error) {
 		text = scanner.Text()
 		urls = strings.Split(text, "|")
 
-		if torProxy.String() != "" && urls[1] != "" {
+		if torProxy.String() != "" && len(urls) > 1 && urls[1] != "" {
 			pools = append(pools, urls[1])
 		} else {
 			pools = append(pools, urls[0])
