@@ -2,7 +2,7 @@ stsd - Secure Time Sync Daemon
 ==============================
 
 Set system date based on HTTP 'date' headers over TLS.
-Inspired by Whonix's sdwdate, and Madaidan's secure-time-sync.
+Inspired by Whonix's sdwdate, and Madaidan's secure-time-sync script.
 
 
 What's wrong with NTP?
