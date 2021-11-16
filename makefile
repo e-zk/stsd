@@ -2,8 +2,8 @@
 .SUFFIXES:
 .PHONY: clean
 
-stsd: main.go
-	go build -o stsd main.go
+stsd: main.go setdate.go
+	go build -o stsd ./...
 
 clean:
 	-rm -f stsd
