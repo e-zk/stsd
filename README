@@ -73,8 +73,9 @@ The optional onion address will be favoured over the clearnet address when the
 Each line in the file is of the format:
 
 	<url>[,onion]
-	
-An example pool file (stsd_pool_example) is provided.
+
+Empty lines, and lines starting with a '#' are ignored.
+An example pool file (stsd_pool_example) is also provided.
 
 
 Forcing an update
