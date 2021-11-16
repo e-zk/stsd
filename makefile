@@ -4,7 +4,7 @@
 
 PREFIX = /usr/local
 
-stsd: main.go setdate.go
+stsd: cmd/main.go cmd/setdate.go
 	go build -ldflags "-w -s" -o stsd -v ./...
 
 install: stsd
