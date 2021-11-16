@@ -1,14 +1,31 @@
 stsd - Secure Time Synchronisation Daemon
 =========================================
 Set system date based on HTTPS date headers.
+Inspired by Whonix's sdwdate, and Madaidan's secure-time-sync.
 
-how it works
+How it works
 ------------
+At random intervals (between 60 minutes and 180 minutes) stsd sets the system
+time based on the timestamp extracted from HTTPS headers (RFC2616). The
+website it connects to is randomly selected from the pool file.
 
-why?
-----
+Optionally it can do this all over Tor, favouring the onion addresses
+specified in the pool file.
 
-pool file format
+
+What's wrong with NTP?
+----------------------
+Standard NTP does not make use any kind of cryptography. No encryption, no
+authentication. This means NTP requests can be sniffed and tampered with
+to send a system the wrong time [1].
+This is bad - correct system time is paramount for use of TLS for example.
+
+If you use OpenBSD's openntpd, it is possible to set 'constraints' that
+make use of HTTPS date headers to define boundaries for NTP time setting [2].
+This strikes a neat compromise between the accuracy of NTP and the security
+of HTTPS.
+
+Pool file format
 ----------------
 The pool file contains a newline separated list of HTTPS URLs, and optionally
 an associated onion address.
@@ -17,11 +34,21 @@ The optional onion address will be favoured over the clearnet address when the
 
 Each line in the file of the format:
 
-	<url>:<onion (optional)>
+	<url>|<onion (optional)>
 	
 Example file:
 
-	https://grapheneos.org/:
-	https://qubes-os.org/:http://qubesosfasa4zl44o4tws22di6kepyzfeqv3tg4e3ztknltfxqrymdad.onion/
-	https://whonix.org/:http://www.dds6qkxpwdeubwucdiaord2xgbbeyds25rbsgr73tbfpqpt4a6vjwsyd.onion/
+	https://grapheneos.org/|
+	https://qubes-os.org/|http://qubesosfasa4zl44o4tws22di6kepyzfeqv3tg4e3ztknltfxqrymdad.onion/
+	https://whonix.org/|http://www.dds6qkxpwdeubwucdiaord2xgbbeyds25rbsgr73tbfpqpt4a6vjwsyd.onion/
+
+References
+----------
+1: https://blog.hboeck.de/archives/863-Dont-update-NTP-stop-using-it.html
+2: https://man.openbsd.org/ntpd.conf#CONSTRAINTS
+
+See also
+--------
+sdwdate: https://www.whonix.org/wiki/Sdwdate
+secure-time-sync: https://gitlab.com/madaidan/secure-time-sync
 
