@@ -10,7 +10,7 @@ What's wrong with NTP?
 Standard NTP does not make use any kind of cryptography. No encryption, no
 authentication. This means NTP requests can be sniffed and tampered with
 to send a system the wrong time [1].
-Correct system time is necessary for use of modern public key cryptography
+Correct system time is essential for the use of modern public key cryptography
 (TLS/SSL for example).
 
 stsd aims to overcome these shortcomings of NTP and provide a secure way of
