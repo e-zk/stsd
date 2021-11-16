@@ -115,11 +115,6 @@ func getDateFrom(pool string) (string, error) {
 		return "", err
 	}
 
-	// TODO remove debug printing of headers
-	for k, v := range resp.Header {
-		log.Printf(">> %v : %v\n", k, v)
-	}
-
 	// get 'Date' header
 	date := resp.Header["Date"][0]
 	if date == "" {
