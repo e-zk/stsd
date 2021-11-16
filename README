@@ -1,7 +1,7 @@
 stsd - Secure Time Sync Daemon
 ==============================
 
-Set system date based on HTTPS date headers.
+Set system date based on HTTP 'date' headers over TLS.
 Inspired by Whonix's sdwdate, and Madaidan's secure-time-sync.
 
 
@@ -13,24 +13,42 @@ to send a system the wrong time [1].
 Correct system time is necessary for use of modern public key cryptography
 (TLS/SSL for example).
 
-stsd aims to overcome these shortcomings of NTP.
-
-If you use OpenBSD's OpenNTPD, it is possible to set 'constraint' URLs.
-These tell ntpd to make use of HTTPS date headers to act as an authenticated
-constraint - NTP packets falling outside of the range of the constraint are
-discarded and NTP servers sending these packets are marked as invalid [2].
-This strikes a good balance between the accuracy of NTP and authentication
-via TLS.
+stsd aims to overcome these shortcomings of NTP and provide a secure way of
+keeping a system's time accurate.
 
 
 How it works
 ------------
 At random intervals (between 60 minutes and 180 minutes) stsd sets the system
-time based on the timestamp extracted from HTTPS headers (RFC2616). The
-website it connects to is randomly selected from the pool file.
+time based on the timestamp extracted from HTTP headers (RFC2616) over TLS.
+The website it gets this header from is randomly selected from a pool file.
 
-Optionally it can do this all over Tor, favouring the onion addresses
+Optionally stsd can do this all over Tor; favouring onion addresses
 specified in the pool file.
+
+
+Caveats
+-------
+Currently stsd does a lot of things that are generally not ideal for
+security-critical software:
+
+ - It must be run as root, since on most systems only root can change the
+   system's date.
+ - It shells out to date(1) to update the system time.
+
+Note that stsd is currently in a very pre-alpha state - in the future it is
+possible that these pitfalls in stsd's design can be remedied.
+
+
+OS support
+----------
+As mentioned previously stsd works by shelling out to date(1) to set the system
+time - as a side-effect of this all systems with a POSIX compliant date(1)
+command are supported. This includes: 
+
+ - MacOS,
+ - {Net,Free,DragonFly,Open}BSD
+ - Most Linux distributions
 
 
 Usage
@@ -65,20 +83,21 @@ Sending stsd the SIGUSR1 signal forces a date update. Currently this does not
 cancel the next date update scheduled.
 
 
-License
--------
-This software is under the permissive MIT free software license. For full
-license text see the LICENSE file.
+See also
+--------
+If you use OpenBSD's OpenNTPD, it is possible to set 'constraint' URLs.
+These tell ntpd to make use of HTTPS date headers to act as an authenticated
+constraint - NTP packets falling outside of the range of the constraint are
+discarded and NTP servers sending these packets are marked as invalid [2].
+This strikes a good balance between the accuracy of NTP and authentication
+via TLS.
+
+sdwdate: https://www.whonix.org/wiki/Sdwdate
+secure-time-sync: https://gitlab.com/madaidan/secure-time-sync
 
 
 References
 ----------
 1: https://blog.hboeck.de/archives/863-Dont-update-NTP-stop-using-it.html
 2: https://man.openbsd.org/ntpd.conf#CONSTRAINTS (https://openntpd.org/)
-
-
-See also
---------
-sdwdate: https://www.whonix.org/wiki/Sdwdate
-secure-time-sync: https://gitlab.com/madaidan/secure-time-sync
 
