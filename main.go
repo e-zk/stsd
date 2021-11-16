@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -187,7 +188,7 @@ func updateDate() {
 	log.Printf("got date: %s", date)
 
 	// set os date
-	err = setOsDate(date, "")
+	err = setOsDate(date, runtime.GOOS)
 	if err != nil {
 		log.Fatalf("failed to set date: %v", err)
 	}
