@@ -156,6 +156,10 @@ func selectPool() (string, error) {
 		)
 
 		text = scanner.Text()
+		if text == "" || strings.HasPrefix(text, "#") {
+			continue
+		}
+
 		urls = strings.Split(text, ",")
 
 		// if torProxy is specified, use onion. otherwise use clearnet url
