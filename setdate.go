@@ -5,25 +5,20 @@ import (
 	"io"
 	"log"
 	"os/exec"
-	"runtime"
 	"time"
 )
 
 const (
-	// date format required by date command: ccyymmddHHMMSS.
+	// date format required by date command: 'ccyymmddHHMM.SS'.
 	// see date(1) manpage.
 	dateFormat = "200601021504.05"
 )
 
 // depending on OS set the date
-// TODO currently works by shelling out to `date` which is not ideal
-func setOsDate(date string, forceOs string) error {
-	os := runtime.GOOS
-
-	if forceOs != "" {
-		os = forceOs
-	}
-
+// NOTE currently works by shelling out to the 'date' command which is not
+//      ideal. however, this does mean all operating systems with POSIX
+//      compliant date(1) are supported.
+func setOsDate(date string, os string) error {
 	// parse date in current locale
 	zone := time.Now().Location()
 	t, err := time.ParseInLocation(time.RFC1123, date, zone)
@@ -31,14 +26,14 @@ func setOsDate(date string, forceOs string) error {
 		return fmt.Errorf("failed to parse given date: %v", err)
 	}
 
-	// convert to local ccyymmddHHMMSS
+	// convert to local 'ccyymmddHHMM.SS' format
 	dateCmdTime := t.Local().Format(dateFormat)
 
-	switch os {
-	// TODO this is UNTESTED on macos, freebsd, dflybsd, linux.
-	// all the following systems' date command follows POSIX
-	// so the command is the same for all of them.
+	// NOTE this is UNTESTED on macos, freebsd, dflybsd, linux.
+	//      all the following systems' date command follows POSIX
+	//      so the command is the same for all of them.
 	// NOTE {free,dfly}bsd + macos do not support -a (adjtime).
+	switch os {
 	case "darwin":
 		fallthrough
 	case "freebsd":
@@ -60,6 +55,7 @@ func setOsDate(date string, forceOs string) error {
 			return fmt.Errorf("failed to run date command: %v", err)
 		}
 
+		// read stderr pipe
 		stderrString, _ := io.ReadAll(stderr)
 
 		if err := cmd.Wait(); err != nil {
