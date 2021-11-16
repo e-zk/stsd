@@ -35,9 +35,8 @@ specified in the pool file.
 
 Usage
 -----
-usage: stsd [-b] [--pool-file=file] [--use-proxy=proxy | --use-tor[=proxy]]
+usage: stsd [--pool-file=file] [--use-proxy=proxy | --use-tor[=proxy]]
 where:
-  -b                 force using bsd date command syntax when setting date.
   --pool-file=file   use the specified pool file (default: /etc/stsd_pool).
   --use-proxy=proxy  proxy network requests through 'proxy' url.
   --use-tor          use tor for network requests. favours onion addresses

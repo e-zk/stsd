@@ -24,9 +24,8 @@ const (
 	minSleep        = 60
 	maxSleep        = 180
 	usageText       = `secure time sync daemon
-usage: stsd [-b] [--pool-file=file] [--use-proxy=proxy | --use-tor[=proxy]]
+usage: stsd [--pool-file=file] [--use-proxy=proxy | --use-tor[=proxy]]
 where:
-  -b                 force using bsd date command syntax when setting date.
   --pool-file=file   use the specified pool file (default: /etc/stsd_pool).
   --use-proxy=proxy  proxy network requests through 'proxy' url.
   --use-tor          use tor for network requests. favours onion addresses
@@ -39,7 +38,6 @@ where:
 var (
 	torProxy torFlag
 	useProxy string
-	bsdDate  bool
 	poolFile string
 )
 
@@ -204,7 +202,6 @@ func main() {
 	rand.Seed(time.Now().Unix())
 
 	// setup flags
-	flag.BoolVar(&bsdDate, "b", false, "use bsd date command format")
 	flag.StringVar(&useProxy, "use-proxy", "", "use specified proxy")
 	flag.Var(&torProxy, "use-tor", "use tor")
 	flag.StringVar(&poolFile, "pool-file", defaultPoolFile, "pool file to use")
@@ -223,7 +220,7 @@ func main() {
 		log.Fatalf("error: cannot use --use-tor option with --use-proxy.")
 	}
 
-	// setup sigusr1 handler
+	// sigusr1 handler
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGUSR1)
 	go func() {
@@ -237,6 +234,7 @@ func main() {
 		}
 	}()
 
+	// main loop
 	for {
 		updateDate()
 		randomSleep()
