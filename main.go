@@ -184,18 +184,20 @@ func updateDate() {
 	if err != nil {
 		log.Fatalf("error getting pool: %v", err)
 	}
-
 	log.Printf("selected pool url: %s", pool)
+
 	// get date from the selected pool url
 	date, err := getDateFrom(pool)
 	if err != nil {
 		log.Fatalf("error getting time: %v", err)
 	}
-
 	log.Printf("got date: %s", date)
 
-	// TODO actually set system date
-	fmt.Printf(">> date -s %s\n", date)
+	// set os date
+	err = setOsDate(date, "")
+	if err != nil {
+		log.Fatalf("failed to set date: %v", err)
+	}
 }
 
 func main() {
