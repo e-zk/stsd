@@ -12,7 +12,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -164,7 +166,8 @@ func selectPool() (string, error) {
 	return pools[rand.Intn(count)], nil
 }
 
-func upDate() {
+// update system date
+func updateDate() {
 	// select a random pool
 	pool, err := selectPool()
 	if err != nil {
@@ -182,7 +185,6 @@ func upDate() {
 
 	// TODO actually set system date
 	fmt.Printf(">> date -s %s\n", date)
-
 }
 
 func main() {
@@ -216,8 +218,22 @@ func main() {
 		log.Fatalf("error: cannot use --use-tor option with --use-proxy.")
 	}
 
+	// setup sigusr1 handler
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc, syscall.SIGUSR1)
+	go func() {
+		for {
+			sig := <-sc
+			switch sig {
+			case syscall.SIGUSR1:
+				log.Printf("received SIGUSR1. forcing time update.")
+				updateDate()
+			}
+		}
+	}()
+
 	for {
-		upDate()
+		updateDate()
 		randomSleep()
 	}
 }
