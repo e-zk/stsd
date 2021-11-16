@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"os/exec"
 	"runtime"
 	"time"
@@ -10,7 +12,7 @@ import (
 const (
 	// date format required by date command: ccyymmddHHMMSS.
 	// see date(1) manpage.
-	dateFormat = "20060102150405"
+	dateFormat = "200601021504.05"
 )
 
 // depending on OS set the date
@@ -47,9 +49,21 @@ func setOsDate(date string, forceOs string) error {
 		fallthrough
 	case "linux":
 		cmd := exec.Command("date", dateCmdTime)
-		err := cmd.Run()
+		stderr, err := cmd.StderrPipe()
 		if err != nil {
+			return fmt.Errorf("error attaching stderr pipe: %v", err)
+		}
+
+		log.Printf("running: '%s'", cmd.String())
+
+		if err := cmd.Start(); err != nil {
 			return fmt.Errorf("failed to run date command: %v", err)
+		}
+
+		stderrString, _ := io.ReadAll(stderr)
+
+		if err := cmd.Wait(); err != nil {
+			return fmt.Errorf("failed to run date command: %v\nstderr: %s", err, stderrString)
 		}
 	default:
 		return fmt.Errorf("setting time on OS '%s' not supported!", runtime.GOOS)
