@@ -46,7 +46,7 @@ As mentioned previously stsd works by shelling out to date(1) to set the system
 time - as a side-effect of this all systems with a POSIX compliant date(1)
 command are supported. This includes: 
 
- - MacOS,
+ - MacOS
  - {Net,Free,DragonFly,Open}BSD
  - Most Linux distributions
 
