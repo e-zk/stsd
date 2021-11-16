@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"crypto/tls"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -44,8 +45,8 @@ func (t *torFlag) IsBoolFlag() bool {
 	return true
 }
 
-// Requests and returns the value of the HTTP 'Date' header from the given
-// url. Enforces a minimum TLS version of TLS1.2 to prevent SSL downgrade
+// requests and returns the value of the HTTP 'Date' header from the given
+// url. enforces a minimum TLS version of TLS1.2 to prevent SSL downgrade
 // attacks.
 func getDateFrom(pool string) (string, error) {
 	// tls config to enforce tls1.2
@@ -76,10 +77,6 @@ func getDateFrom(pool string) (string, error) {
 				return conn, err
 			},
 		}
-
-		// TODO if .onion, don't enforce TLS
-		// this may be not neccessary since onions are usually over http:// anyways
-		// and go should pick that up and not enforce tls?
 	}
 
 	// make request
@@ -88,7 +85,7 @@ func getDateFrom(pool string) (string, error) {
 		return "", err
 	}
 
-	//
+	// TODO remove debug printing of headers
 	for k, v := range resp.Header {
 		log.Printf(">> %v : %v\n", k, v)
 	}
@@ -99,12 +96,15 @@ func getDateFrom(pool string) (string, error) {
 		date = resp.Header["date"][0]
 	}
 
-	return date, err
+	// if there's no date
+	if date == "" {
+		return "", errors.New("could not get date from header")
+	}
+
+	return date, nil
 }
 
-/**
- * Sleep for random amount of time
- */
+// sleep for random amount of time
 func randomSleep() {
 	sleepTime := time.Duration(minSleep + rand.Int63n(maxSleep-minSleep+1))
 	log.Printf("sleeping for %v\n", sleepTime*time.Minute)
@@ -167,17 +167,15 @@ func main() {
 	}
 
 	for {
-		log.Printf("proxy: %s\n", torProxy.String())
-
-		// TODO get a random pool
+		// sekect a random pool
 		pool, err := selectPool()
 		if err != nil {
 			log.Fatalf("error getting pool: %v", err)
 		}
 
-		fmt.Printf(">> %s\n", pool)
+		log.Printf("selected pool url: %s", pool)
 
-		// TODO get date from random pool
+		// get date from the selected pool url
 		date, err := getDateFrom(pool)
 		if err != nil {
 			log.Fatalf("error getting time: %v", err)
