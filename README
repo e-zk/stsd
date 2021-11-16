@@ -1,5 +1,5 @@
 stsd - Secure Time Sync Daemon
-=========================================
+==============================
 
 Set system date based on HTTPS date headers.
 Inspired by Whonix's sdwdate, and Madaidan's secure-time-sync.
@@ -15,10 +15,12 @@ Correct system time is necessary for use of modern public key cryptography
 
 stsd aims to overcome these shortcomings of NTP.
 
-Alternatively, if you use OpenBSD's openntpd, it is possible to set
-'constraints' that make use of HTTPS date headers to act as an authenticated
+If you use OpenBSD's OpenNTPD, it is possible to set 'constraint' URLs.
+These tell ntpd to make use of HTTPS date headers to act as an authenticated
 constraint - NTP packets falling outside of the range of the constraint are
 discarded and NTP servers sending these packets are marked as invalid [2].
+This strikes a good balance between the accuracy of NTP and authentication
+via TLS.
 
 
 How it works
@@ -56,6 +58,12 @@ Each line in the file is of the format:
 	<url>[,onion]
 	
 An example pool file (stsd_pool_example) is provided.
+
+
+Forcing an update
+-----------------
+Sending stsd the SIGUSR1 signal forces a date update. Currently this does not
+cancel the next date update scheduled.
 
 
 License
