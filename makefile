@@ -2,7 +2,7 @@
 .SUFFIXES:
 .PHONY: clean
 
-stsd:
+stsd: main.go
 	go build -o stsd main.go
 
 clean:
