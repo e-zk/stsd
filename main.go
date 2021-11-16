@@ -130,7 +130,7 @@ func selectPool() (string, error) {
 		)
 
 		text = scanner.Text()
-		urls = strings.Split(text, "|")
+		urls = strings.Split(text, ",")
 
 		if torProxy.String() != "" && len(urls) > 1 && urls[1] != "" {
 			pools = append(pools, urls[1])
@@ -167,7 +167,7 @@ func main() {
 	}
 
 	for {
-		// sekect a random pool
+		// select a random pool
 		pool, err := selectPool()
 		if err != nil {
 			log.Fatalf("error getting pool: %v", err)
