@@ -1,20 +1,16 @@
 package main
 
 import (
-	"bufio"
-	"crypto/tls"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"log/syslog"
 	"math/rand"
 	"net"
-	"net/http"
-	"net/url"
 	"os"
-	"os/signal"
+	"os/user"
 	"runtime"
-	"strings"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -22,12 +18,15 @@ import (
 const (
 	defaultTorProxy = "socks5://127.0.0.1:9050"
 	defaultPoolFile = "/etc/stsd_pool"
-	minSleep        = 60
-	maxSleep        = 180
+	defaultSocket   = "/var/run/stsd.sock"
+	socketMsgLen    = 29
+	minSleep        = 64
+	maxSleep        = 1024
 	usageText       = `secure time sync daemon
-usage: stsd [--pool-file=file] [--use-proxy=proxy | --use-tor[=proxy]]
+usage: stsd [--user=username] [--pool-file=file] [--use-proxy=proxy | --use-tor[=proxy]]
 where:
-  --pool-file=file   use the specified pool file (default: /etc/stsd_pool).
+  --user=username    user to run child process as (default: '_stsd').
+  --pool-file=file   use the specified pool file (default: '/etc/stsd_pool').
   --use-proxy=proxy  proxy network requests through 'proxy' url.
   --use-tor          use tor for network requests. favours onion addresses
                      from the pool file. tor's proxy url can be configured
@@ -37,9 +36,13 @@ where:
 )
 
 var (
-	torProxy torFlag
-	useProxy string
-	poolFile string
+	originalArgs  []string
+	torProxy      torFlag
+	useProxy      string
+	poolFile      string
+	pname         string
+	childProcUser string
+	childProcAttr *syscall.ProcAttr
 )
 
 // custom flag
@@ -58,157 +61,130 @@ func (t *torFlag) IsBoolFlag() bool {
 	return true
 }
 
-// requests and returns the value of the HTTP 'Date' header from the given
-// url. enforces a minimum TLS version of TLS1.2 to prevent SSL downgrade
-// attacks.
-func getDateFrom(pool string) (string, error) {
-	// tls config to enforce tls1.2
-	tlsConf := &tls.Config{
-		MinVersion: tls.VersionTLS12,
-	}
-
-	// setup client to use tlsConf
-	client := &http.Client{
-		Transport: &http.Transport{
-			DialTLS: func(network, addr string) (net.Conn, error) {
-				conn, err := tls.Dial(network, addr, tlsConf)
-				return conn, err
-			},
-		},
-	}
-
-	// use tor socks proxy, or user proxy if specified
-	if torProxy.String() != "" {
-		proxyUrl, err := url.Parse(torProxy.proxyUrl)
-		if err != nil {
-			return "", fmt.Errorf("could not parse proxy url '%s': %v", proxyUrl, err)
-		}
-
-		log.Printf("using tor proxy: '%s'", proxyUrl.String())
-
-		client.Transport = &http.Transport{
-			Proxy: http.ProxyURL(proxyUrl),
-			DialTLS: func(network, addr string) (net.Conn, error) {
-				conn, err := tls.Dial(network, addr, tlsConf)
-				return conn, err
-			},
-		}
-	} else if useProxy != "" {
-		proxyUrl, err := url.Parse(useProxy)
-		if err != nil {
-			return "", fmt.Errorf("could not parse proxy url '%s': %v", proxyUrl, err)
-		}
-
-		log.Printf("using proxy: '%s'", proxyUrl.String())
-
-		client.Transport = &http.Transport{
-			Proxy: http.ProxyURL(proxyUrl),
-			DialTLS: func(network, addr string) (net.Conn, error) {
-				conn, err := tls.Dial(network, addr, tlsConf)
-				return conn, err
-			},
-		}
-	}
-
-	// make request
-	resp, err := client.Get(pool)
-	if err != nil {
-		return "", err
-	}
-
-	// get 'Date' header
-	date := resp.Header["Date"][0]
-	if date == "" {
-		date = resp.Header["date"][0]
-	}
-
-	// if there's no date
-	if date == "" {
-		return "", errors.New("could not get date from header")
-	}
-
-	return date, nil
-}
-
-// sleep for random amount of time
+// Sleep for random amount of time
 func randomSleep() {
 	sleepTime := time.Duration(minSleep + rand.Int63n(maxSleep-minSleep+1))
-	log.Printf("sleeping for %v\n", sleepTime*time.Minute)
-	time.Sleep(sleepTime * time.Minute)
+	log.Printf("sleeping for %v\n", sleepTime*time.Second)
+	time.Sleep(sleepTime * time.Second)
 }
 
-// randomly select a pool from the list of pools
-func selectPool() (string, error) {
-	f, err := os.Open(poolFile)
+// Check program is running as root
+func checkRoot() (bool, error) {
+	// check if we're running as root
+	curUser, err := user.Current()
 	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	var count int
-	var pools []string
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		var (
-			text string
-			urls []string
-		)
-
-		text = scanner.Text()
-		if text == "" || strings.HasPrefix(text, "#") {
-			continue
-		}
-
-		urls = strings.Split(text, ",")
-
-		// if torProxy is specified, use onion. otherwise use clearnet url
-		if torProxy.String() != "" && len(urls) > 1 && urls[1] != "" {
-			pools = append(pools, urls[1])
-		} else {
-			pools = append(pools, urls[0])
-		}
-		count++
+		return false, fmt.Errorf("error getting user information: %v", err)
 	}
 
-	// return random url from pools array
-	return pools[rand.Intn(count)], nil
+	uid, err := strconv.Atoi(curUser.Uid)
+	if err != nil {
+		return false, fmt.Errorf("error parsing uid: %v", err)
+	}
+
+	if uid != 0 {
+		return false, nil
+	}
+
+	return true, nil
 }
 
-// update system date
-func updateDate() {
-	// select a random pool
-	pool, err := selectPool()
-	if err != nil {
-		log.Fatalf("error getting pool: %v", err)
-	}
-	log.Printf("selected pool url: %s", pool)
+// Update system date
+// 1. Fork child process
+// 2. Wait for data from the given socket listener
+// 3. Set received date
+func updateDate(l net.Listener) {
+	// update arguments for network process
+	newArgs := append(originalArgs, "-P=network")
 
-	// get date from the selected pool url
-	date, err := getDateFrom(pool)
+	cid, err := syscall.ForkExec(newArgs[0], newArgs, childProcAttr)
 	if err != nil {
-		log.Fatalf("error getting time: %v", err)
+		log.Fatalf("error forking: %v", err)
 	}
-	log.Printf("got date: %s", date)
+	log.Printf("forked network process with pid: %d", cid)
+
+	// get child process info
+	var cproc *os.Process
+	if cproc, err = os.FindProcess(cid); err != nil {
+		log.Fatalf("error getting child process information: %v", err)
+	}
+
+	// accept connection on listener
+	conn, err := l.Accept()
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
+
+	// read date buffer from socket
+	dateBuf := make([]byte, socketMsgLen)
+	n, err := conn.Read(dateBuf)
+	if n != socketMsgLen {
+		log.Fatalf("error: socket content has incorrect length")
+	}
+	if err != nil {
+		log.Fatalf("error reading from socket: %v", err)
+	}
+	log.Printf("got date: %v", string(dateBuf))
 
 	// set os date
-	err = setOsDate(date, runtime.GOOS)
+	err = setOsDate(string(dateBuf), runtime.GOOS)
 	if err != nil {
 		log.Fatalf("failed to set date: %v", err)
 	}
+
+	// wait for child process to exit
+	cproc.Wait()
+
+	// close connection
+	conn.Close()
 }
 
-func main() {
+func init() {
 	rand.Seed(time.Now().Unix())
+
+	// save original arguments before parsing
+	originalArgs = os.Args
 
 	// setup flags
 	flag.StringVar(&useProxy, "use-proxy", "", "use specified proxy")
 	flag.Var(&torProxy, "use-tor", "use tor")
 	flag.StringVar(&poolFile, "pool-file", defaultPoolFile, "pool file to use")
+	flag.StringVar(&childProcUser, "user", "_stsd", "user to run child as")
+	flag.StringVar(&pname, "P", "", "")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, usageText)
 	}
 	flag.Parse()
+}
+
+func main() {
+	// setup syslog
+	syslogger, err := syslog.New(syslog.LOG_INFO|syslog.LOG_DAEMON, "stsd")
+	if err != nil {
+		log.Fatalf("error attaching to syslog: %v", err)
+	}
+	log.SetFlags(0)
+	log.SetOutput(syslogger)
+
+	// setup attributes for child process
+	childUser, err := user.Lookup(childProcUser)
+	if err != nil {
+		log.Fatalf("error getting child user info: %v", err)
+	}
+	uid, err := strconv.ParseUint(childUser.Uid, 10, 32)
+	if err != nil {
+		log.Fatalf("error converting uid to int: %v", err)
+	}
+	childProcAttr = &syscall.ProcAttr{
+		Sys: &syscall.SysProcAttr{
+			Credential: &syscall.Credential{
+				Uid: uint32(uid),
+			},
+			Setsid: true,
+		},
+	}
+
+	// remove old socket
+	os.RemoveAll(defaultSocket)
 
 	// if passed w/o an argument set it to the default proxy url
 	if torProxy.String() == "true" {
@@ -221,22 +197,52 @@ func main() {
 	}
 
 	// sigusr1 handler
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGUSR1)
-	go func() {
-		for {
-			sig := <-sc
-			switch sig {
-			case syscall.SIGUSR1:
-				log.Printf("received SIGUSR1. forcing time update.")
-				updateDate()
+	/*
+		sc := make(chan os.Signal, 1)
+		signal.Notify(sc, syscall.SIGUSR1)
+		go func() {
+			for {
+				sig := <-sc
+				switch sig {
+				case syscall.SIGUSR1:
+					log.Printf("received SIGUSR1. forcing time update.")
+					updateDate()
+				}
 			}
-		}
-	}()
+		}()
+	*/
 
-	// main loop
-	for {
-		updateDate()
-		randomSleep()
+	syscall.Umask(0117)
+
+	// run the network process logic if -P has been specified
+	if pname == "network" {
+		NetworkLogic()
+	} else {
+		isRoot, err := checkRoot()
+		if err != nil {
+			log.Fatalf("%v", err)
+		}
+
+		if !isRoot {
+			log.Fatal("error: stsd must be run as root")
+		}
+
+		// listen on socket
+		l, err := net.Listen("unixpacket", defaultSocket)
+		if err != nil {
+			log.Fatalf("error opening listener on socket: %v", err)
+		}
+
+		// fork
+		// wait for connection from child via socket
+		// read date from socket
+		// set system date
+		for {
+			updateDate(l)
+
+			// sleep for random amount of time
+			randomSleep()
+		}
+		l.Close()
 	}
 }
