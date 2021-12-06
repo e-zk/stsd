@@ -34,35 +34,38 @@ func setOsDate(date string, os string) error {
 	//      so the command is the same for all of them.
 	// NOTE {free,dfly}bsd + macos do not support -a (adjtime).
 	switch os {
-	case "darwin":
+	case "netbsd":
 		fallthrough
+	case "openbsd":
+		cmd := exec.Command("date", "-a", dateCmdTime)
 	case "freebsd":
 		fallthrough
 	case "dragonflybsd":
 		fallthrough
-	case "openbsd":
+	case "darwin":
 		fallthrough
 	case "linux":
 		cmd := exec.Command("date", dateCmdTime)
-		stderr, err := cmd.StderrPipe()
-		if err != nil {
-			return fmt.Errorf("error attaching stderr pipe: %v", err)
-		}
-
-		log.Printf("running: '%s'", cmd.String())
-
-		if err := cmd.Start(); err != nil {
-			return fmt.Errorf("failed to run date command: %v", err)
-		}
-
-		// read stderr pipe
-		stderrString, _ := io.ReadAll(stderr)
-
-		if err := cmd.Wait(); err != nil {
-			return fmt.Errorf("failed to run date command: %v\nstderr: %s", err, stderrString)
-		}
 	default:
 		return fmt.Errorf("setting time on OS '%s' not supported!", os)
+	}
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("error attaching stderr pipe: %v", err)
+	}
+
+	log.Printf("running: '%s'", cmd.String())
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to run date command: %v", err)
+	}
+
+	// read stderr pipe
+	stderrString, _ := io.ReadAll(stderr)
+
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("failed to run date command: %v\nstderr: %s", err, stderrString)
 	}
 
 	return nil
