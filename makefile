@@ -5,7 +5,7 @@
 PREFIX = /usr/local
 
 stsd: cmd/main.go cmd/setdate.go
-	go build -ldflags "-w -s" -o stsd -v ./...
+	go build -ldflags "-linkmode external -w -s -extldflags '-static'" -o stsd ./cmd/...
 
 install: stsd
 	install -c -m 0755 stsd $(PREFIX)/bin
