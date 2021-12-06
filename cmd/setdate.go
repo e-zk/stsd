@@ -29,15 +29,19 @@ func setOsDate(date string, os string) error {
 	// convert to local 'ccyymmddHHMM.SS' format
 	dateCmdTime := t.Local().Format(dateFormat)
 
+	var cmd *exec.Cmd
+
 	// NOTE this is UNTESTED on macos, freebsd, dflybsd, linux.
-	//      all the following systems' date command follows POSIX
-	//      so the command is the same for all of them.
+	//      however, all the systems' date command follows POSIX
 	// NOTE {free,dfly}bsd + macos do not support -a (adjtime).
 	switch os {
+	// net+openbsd support adjtime(2)
 	case "netbsd":
 		fallthrough
 	case "openbsd":
-		cmd := exec.Command("date", "-a", dateCmdTime)
+		cmd = exec.Command("date", "-a", dateCmdTime)
+
+	// the rest, do not
 	case "freebsd":
 		fallthrough
 	case "dragonflybsd":
@@ -45,7 +49,7 @@ func setOsDate(date string, os string) error {
 	case "darwin":
 		fallthrough
 	case "linux":
-		cmd := exec.Command("date", dateCmdTime)
+		cmd = exec.Command("date", dateCmdTime)
 	default:
 		return fmt.Errorf("setting time on OS '%s' not supported!", os)
 	}
@@ -65,7 +69,7 @@ func setOsDate(date string, os string) error {
 	stderrString, _ := io.ReadAll(stderr)
 
 	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("failed to run date command: %v\nstderr: %s", err, stderrString)
+		return fmt.Errorf("failed to run date command: %v. stderr: %s", err, stderrString)
 	}
 
 	return nil
