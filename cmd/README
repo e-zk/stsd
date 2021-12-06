@@ -1,0 +1,12 @@
+* main.go
+  - main program
+  - argument parsing
+  - parent process logic
+
+* netw.go
+  - network process (child) logic
+  - makes network requests
+
+* setdate.go
+  - runs 'date' command based on OS
+
