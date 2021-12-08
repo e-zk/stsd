@@ -18,7 +18,7 @@ const (
 // NOTE currently works by shelling out to the 'date' command which is not
 //      ideal. however, this does mean all operating systems with POSIX
 //      compliant date(1) are supported.
-func setOsDate(date string, os string) error {
+func setOsDate(date, dateCmd, os string) error {
 	// parse date in current locale
 	zone := time.Now().Location()
 	t, err := time.ParseInLocation(time.RFC1123, date, zone)
@@ -39,7 +39,7 @@ func setOsDate(date string, os string) error {
 	case "netbsd":
 		fallthrough
 	case "openbsd":
-		cmd = exec.Command("date", "-a", dateCmdTime)
+		cmd = exec.Command(dateCmd, "-a", dateCmdTime)
 
 	// the rest, do not
 	case "freebsd":
@@ -49,7 +49,7 @@ func setOsDate(date string, os string) error {
 	case "darwin":
 		fallthrough
 	case "linux":
-		cmd = exec.Command("date", dateCmdTime)
+		cmd = exec.Command(dateCmd, dateCmdTime)
 	default:
 		return fmt.Errorf("setting time on OS '%s' not supported!", os)
 	}

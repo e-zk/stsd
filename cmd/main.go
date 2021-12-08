@@ -16,15 +16,19 @@ import (
 )
 
 const (
-	defaultTorProxy = "socks5://127.0.0.1:9050"
-	defaultPoolFile = "/etc/stsd_pool"
-	defaultSocket   = "/var/run/stsd.sock"
-	socketMsgLen    = 29
-	minSleep        = 64
-	maxSleep        = 1024
-	usageText       = `secure time sync daemon
-usage: stsd [--user=username] [--pool-file=file] [--use-proxy=proxy | --use-tor[=proxy]]
+	defaultTorProxy  = "socks5://127.0.0.1:9050"
+	defaultPoolFile  = "/etc/stsd_pool"
+	defaultSocket    = "/var/run/stsd.sock"
+	defaultDateCmd   = "/bin/date"
+	defaultChildUser = "_stsd"
+	socketMsgLen     = 29
+	minSleep         = 64
+	maxSleep         = 1024
+	usageText        = `secure time sync daemon
+usage: stsd [--date-cmd=path] [--user=username] [--pool-file=file]
+            [--use-proxy=proxy | --use-tor[=proxy]]
 where:
+  --date-cmd=path    absolute path to date(1) command (default: '/bin/date').
   --user=username    user to run child process as (default: '_stsd').
   --pool-file=file   use the specified pool file (default: '/etc/stsd_pool').
   --use-proxy=proxy  proxy network requests through 'proxy' url.
@@ -41,11 +45,12 @@ var (
 	useProxy      string
 	poolFile      string
 	pname         string
+	dateCmdPath   string
 	childProcUser string
 	childProcAttr *syscall.ProcAttr
 )
 
-// custom flag
+// Custom flag
 type torFlag struct {
 	proxyUrl string
 }
@@ -126,7 +131,7 @@ func updateDate(l net.Listener) {
 	log.Printf("got date: %v", string(dateBuf))
 
 	// set os date
-	err = setOsDate(string(dateBuf), runtime.GOOS)
+	err = setOsDate(string(dateBuf), dateCmdPath, runtime.GOOS)
 	if err != nil {
 		log.Fatalf("failed to set date: %v", err)
 	}
@@ -145,11 +150,16 @@ func init() {
 	originalArgs = os.Args
 
 	// setup flags
-	flag.StringVar(&useProxy, "use-proxy", "", "use specified proxy")
 	flag.Var(&torProxy, "use-tor", "use tor")
-	flag.StringVar(&poolFile, "pool-file", defaultPoolFile, "pool file to use")
-	flag.StringVar(&childProcUser, "user", "_stsd", "user to run child as")
+	flag.StringVar(&useProxy, "use-proxy", "", "")
+	flag.StringVar(&poolFile, "pool-file", defaultPoolFile, "")
+	flag.StringVar(&childProcUser, "user", defaultChildUser, "")
+	flag.StringVar(&dateCmdPath, "date-cmd", defaultDateCmd, "")
+
+	// this is the not-so-secret flag that tells stsd that it needs to act
+	// as the networking process.
 	flag.StringVar(&pname, "P", "", "")
+
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, usageText)
 	}
@@ -183,9 +193,6 @@ func main() {
 		},
 	}
 
-	// remove old socket
-	os.RemoveAll(defaultSocket)
-
 	// if passed w/o an argument set it to the default proxy url
 	if torProxy.String() == "true" {
 		torProxy.Set(defaultTorProxy)
@@ -196,25 +203,11 @@ func main() {
 		log.Fatalf("error: cannot use --use-tor option with --use-proxy.")
 	}
 
-	// sigusr1 handler
-	/*
-		sc := make(chan os.Signal, 1)
-		signal.Notify(sc, syscall.SIGUSR1)
-		go func() {
-			for {
-				sig := <-sc
-				switch sig {
-				case syscall.SIGUSR1:
-					log.Printf("received SIGUSR1. forcing time update.")
-					updateDate()
-				}
-			}
-		}()
-	*/
-
+	// remove old socket
+	os.RemoveAll(defaultSocket)
 	syscall.Umask(0117)
 
-	// run the network process logic if -P has been specified
+	// run the network process logic if -P has been specified as 'network'
 	if pname == "network" {
 		NetworkLogic()
 	} else {
