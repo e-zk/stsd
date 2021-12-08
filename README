@@ -19,25 +19,28 @@ keeping a system's time accurate.
 
 How it works
 ------------
-At random intervals (between 60 minutes and 180 minutes) stsd sets the system
+At random intervals (between 64 seconds and 1024 seconds) stsd sets the system
 time based on the timestamp extracted from HTTP headers (RFC2616) over TLS.
 The website it gets this header from is randomly selected from a pool file.
 
-Optionally stsd can do this all over Tor; favouring onion addresses
-specified in the pool file.
+Optionally stsd can do this all over Tor; favouring onion addresses specified
+in the pool file.
 
 
 Caveats
 -------
-Currently stsd does a lot of things that are generally not ideal for
+Currently stsd does a few things that are generally not ideal for
 security-critical software:
 
- - It must be run as root, since on most systems only root can change the
-   system's date.
- - It shells out to date(1) to update the system time.
+ 1. It must be run as root, since on most systems only root can change the
+    system's date.
+ 2. It shells out to date(1) to update the system time.
 
-Note that stsd is currently in a very pre-alpha state - in the future it is
-possible that these pitfalls in stsd's design can be remedied.
+In regard to the first caveat, stsd aims to follow the principle of least
+privilege by only making network requests via an unprivileged child processs.
+This unprivilged "network" process makes the necessary network request, then
+sends the date information back to the parent process via a socket.
+The parent process then sets the system time using its root privilges.
 
 
 OS support
@@ -46,21 +49,24 @@ As mentioned previously stsd works by shelling out to date(1) to set the system
 time - as a side-effect of this all systems with a POSIX compliant date(1)
 command are supported. This includes: 
 
- - MacOS
  - {Net,Free,DragonFly,Open}BSD
+ - MacOS
  - Most Linux distributions
 
 
 Usage
 -----
-usage: stsd [--pool-file=file] [--use-proxy=proxy | --use-tor[=proxy]]
+usage: stsd [--date-cmd=path] [--user=username] [--pool-file=file]
+            [--use-proxy=proxy | --use-tor[=proxy]]
 where:
-  --pool-file=file   use the specified pool file (default: /etc/stsd_pool).
+  --date-cmd=path    absolute path to date command (default: '/bin/date').
+  --user=username    user to run child process as (default: '_stsd').
+  --pool-file=file   use the specified pool file (default: '/etc/stsd_pool').
   --use-proxy=proxy  proxy network requests through 'proxy' url.
   --use-tor          use tor for network requests. favours onion addresses
                      from the pool file. tor's proxy url can be configured
                      by passing as an argument flag: '--use-tor=proxy'
-                     (default tor proxy url: 'socks5://localhost:9050')
+                     (default tor proxy url: 'socks5://localhost:9050').
 
 
 Pool file format
@@ -75,13 +81,7 @@ Each line in the file is of the format:
 	<url>[,onion]
 
 Empty lines, and lines starting with a '#' are ignored.
-An example pool file (stsd_pool_example) is also provided.
-
-
-Forcing an update
------------------
-Sending stsd the SIGUSR1 signal forces a date update. Currently this does not
-cancel the next date update scheduled.
+An example pool file (stsd_pool_example) is provided.
 
 
 See also
